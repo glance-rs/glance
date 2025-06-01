@@ -1,3 +1,8 @@
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::{ParallelSlice, ParallelSliceMut},
+};
+
 use super::Image;
 
 pub struct PixelIter<'a> {
@@ -66,5 +71,36 @@ impl Image {
             image: self,
             idx: 0,
         }
+    }
+
+    pub fn par_pixels(&self) -> impl ParallelIterator<Item = (usize, usize, [u8; 4])> {
+        let width = self.width as usize;
+        self.data
+            .par_chunks_exact(4)
+            .enumerate()
+            .map(move |(idx, chunk)| {
+                let x = idx % width;
+                let y = idx / width;
+                let pixel = [chunk[0], chunk[1], chunk[2], chunk[3]];
+                (x, y, pixel)
+            })
+    }
+
+    pub fn par_pixels_mut(&mut self) -> impl ParallelIterator<Item = (usize, usize, &mut [u8; 4])> {
+        let width = self.width as usize;
+
+        self.data
+            .par_chunks_exact_mut(4)
+            .enumerate()
+            .map(move |(idx, chunk)| {
+                let x = idx % width;
+                let y = idx / width;
+
+                // Chunk is exactly 4 bytes (from par_chunks_exact_mut),
+                // and Rayon ensures chunks are disjoint so it's safe to cast to &mut [u8; 4]
+                let pixel = unsafe { &mut *(chunk.as_mut_ptr() as *mut [u8; 4]) };
+
+                (x, y, pixel)
+            })
     }
 }
