@@ -2,7 +2,7 @@ use super::traits::Drawable;
 use crate::Result;
 
 /// A circle shape that can be drawn onto an image.
-/// The circle can be either filled or drawn as an outline with a specified thickness.
+/// Can be either filled or drawn as an outline with a specified thickness.
 /// The color is specified in RGBA8 format.
 pub struct Circle {
     /// Center of the circle (x, y)
@@ -24,9 +24,8 @@ impl Drawable for Circle {
         let thickness = self.thickness as i32;
         let dims = image.dimensions();
 
-        let outer_radius_sq = radius.pow(2);
-        let inner_radius = radius.saturating_sub(thickness);
-        let inner_radius = inner_radius.pow(2);
+        let outer_radius_sq = radius + thickness;
+        let inner_radius = radius.pow(2);
 
         for dy in -radius..radius {
             for dx in -radius..radius {
@@ -59,6 +58,9 @@ impl Drawable for Circle {
     }
 }
 
+/// An axis aligned bounding box that can be drawn onto an image.
+/// Can be either filled or drawn as an outline with a specified thickness.
+/// The color is specified in RGBA8 format.
 pub struct AABB {
     /// Top-left corner (x, y)
     pub position: [u32; 2],

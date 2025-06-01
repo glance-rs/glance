@@ -44,10 +44,10 @@ impl Image {
         })
     }
 
-    /// Opens an image from the given path.
+    /// Saves an image to the given path
     ///
-    /// Returns an error if the file does not exist or cannot be decoded.
-    /// Supports all formats recognized by the `image` crate.
+    /// Returns an error if the file cannot be created or buffer is invalid.
+    /// Format is recognized from file extension (see [`image::ImageBuffer::save`] for more info).
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let buffer: ImageBuffer<Rgba<u8>, _> =
             ImageBuffer::from_raw(self.width, self.height, self.data.clone())
@@ -93,7 +93,8 @@ impl Image {
         Ok(())
     }
 
-    /// Gets the color of a pixel. Top left is treated as origin, x-axis goes horizontally.
+    /// Gets the color of a pixel. Top left is treated as origin. Right is positive x, down is
+    /// positive y.
     pub fn get_pixel(&self, position: [u32; 2]) -> Result<[u8; 4]> {
         let dims = self.dimensions();
         if position[0] >= dims[0] || position[1] >= dims[1] {
