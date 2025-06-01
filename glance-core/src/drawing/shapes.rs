@@ -120,3 +120,80 @@ impl Drawable for AABB {
         Ok(())
     }
 }
+
+/// A line that can be drawn onto an image. Uses a square brush (Bresenham's algorithm).
+/// The color is specified in RGBA8 format.
+pub struct Line {
+    /// Start point (x, y)
+    pub start: [u32; 2],
+    /// End point (x, y)
+    pub end: [u32; 2],
+    /// Color in RGBA8 format
+    pub color: [u8; 4],
+    /// Line segment thickness (only used when `filled = false`)
+    pub thickness: u32,
+}
+
+impl Drawable for Line {
+    fn draw_on(&self, image: &mut crate::img::Image) -> Result<()> {
+        let [x0, y0] = self.start;
+        let [x1, y1] = self.end;
+
+        let dims = image.dimensions();
+
+        let x0 = x0 as i32;
+        let y0 = y0 as i32;
+        let x1 = x1 as i32;
+        let y1 = y1 as i32;
+        let thickness = self.thickness as i32;
+        let half_thickness = thickness / 2;
+
+        // Difference in each direction
+        let dx = (x1 - x0).abs();
+        let dy = -(y1 - y0).abs();
+        // Step in each direcion
+        let sx = if x0 < x1 { 1 } else { -1 };
+        let sy = if y0 < y1 { 1 } else { -1 };
+        let mut err = dx + dy;
+        let mut x = x0;
+        let mut y = y0;
+
+        loop {
+            for tx in -half_thickness..=half_thickness {
+                for ty in -half_thickness..=half_thickness {
+                    let nx = x + tx;
+                    let ny = y + ty;
+
+                    // Early return for out of bounds pixels
+                    if nx < 0 || ny < 0 {
+                        continue;
+                    }
+
+                    let (nx, ny) = (nx as u32, ny as u32);
+                    if nx >= dims[0] || ny >= dims[1] {
+                        continue;
+                    }
+
+                    image.alpha_blend_pixel([nx, ny], self.color)?;
+                }
+            }
+
+            // Done if reached end point
+            if x == x1 && y == y1 {
+                break;
+            }
+
+            let err_twice = 2 * err;
+            if err_twice >= dy {
+                err += dy;
+                x += sx;
+            }
+            if err_twice <= dx {
+                err += dx;
+                y += sy;
+            }
+        }
+
+        Ok(())
+    }
+}

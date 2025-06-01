@@ -9,7 +9,7 @@ pub use self::error::{CoreError, Result};
 mod tests {
     use super::*;
     use crate::{
-        drawing::shapes::{AABB, Circle},
+        drawing::shapes::{AABB, Circle, Line},
         img::Image,
     };
     use std::path::PathBuf;
@@ -72,6 +72,13 @@ mod tests {
             radius: 150,
             filled: false,
             thickness: 8,
+        })?;
+
+        img.draw(Line {
+            start: [0, 0],
+            end: [256, 500],
+            color: [120, 120, 200, 255],
+            thickness: 2,
         })?;
 
         if std::env::var("NO_DISPLAY").is_err() {
