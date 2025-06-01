@@ -7,3 +7,4 @@ edition = "2024"
 derive_more = { version = "2.0.1", features = ["from"] }
 image = "0.25.6"
 minifb = { version = "0.28.0", features = ["wayland"] }
+rayon = "1.10.0"

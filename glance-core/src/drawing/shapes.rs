@@ -24,11 +24,12 @@ impl Drawable for Circle {
         let thickness = self.thickness as i32;
         let dims = image.dimensions();
 
-        let outer_radius_sq = radius + thickness;
-        let inner_radius = radius.pow(2);
+        let outer_radius = radius + thickness;
+        let outer_radius_sq = outer_radius.pow(2);
+        let inner_radius_sq = radius.pow(2);
 
-        for dy in -radius..radius {
-            for dx in -radius..radius {
+        for dy in -outer_radius..outer_radius {
+            for dx in -outer_radius..outer_radius {
                 let nx = cx + dx;
                 let ny = cy + dy;
 
@@ -45,8 +46,8 @@ impl Drawable for Circle {
                 let distance_sq = dx * dx + dy * dy;
                 // Check if (nx, ny) is within bounds
                 let draw_pixel = match self.filled {
-                    true => distance_sq <= outer_radius_sq,
-                    false => distance_sq <= outer_radius_sq && distance_sq >= inner_radius,
+                    true => distance_sq <= inner_radius_sq,
+                    false => distance_sq <= outer_radius_sq && distance_sq >= inner_radius_sq,
                 };
 
                 if draw_pixel {

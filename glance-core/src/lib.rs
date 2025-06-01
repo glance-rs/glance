@@ -3,7 +3,7 @@ mod error;
 pub mod img;
 pub(crate) mod utils;
 
-pub use self::error::{Error, Result};
+pub use self::error::{CoreError, Result};
 
 #[cfg(test)]
 mod tests {
@@ -21,6 +21,11 @@ mod tests {
         path.push("../media/test_imgs/eye.png");
 
         let img = Image::open(&path)?;
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("open_valid_image")?;
+        }
+
         assert!(!img.is_empty());
         Ok(())
     }
@@ -61,6 +66,18 @@ mod tests {
             filled: false,
         })?;
 
+        img.draw(Circle {
+            position: center,
+            color: blue,
+            radius: 150,
+            filled: false,
+            thickness: 8,
+        })?;
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("draw_shapes")?;
+        }
+
         assert!(img.get_pixel(center)? == green);
         Ok(())
     }
@@ -84,6 +101,10 @@ mod tests {
             filled: false,
             thickness: 5,
         })?;
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("draw_partially_out_of_bounds_shape")?;
+        }
 
         assert!(img.get_pixel([dims[0] - 1, dims[1] - 1])? == [0, 0, 0, 0]);
         Ok(())

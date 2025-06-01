@@ -4,7 +4,8 @@
 
 use crate::drawing::traits::Drawable;
 use crate::utils;
-use crate::{Error, Result};
+use crate::{CoreError, Result};
+pub mod iterators;
 
 use image::{ImageBuffer, ImageReader, Rgba};
 use minifb::{Key, Window, WindowOptions};
@@ -51,11 +52,28 @@ impl Image {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let buffer: ImageBuffer<Rgba<u8>, _> =
             ImageBuffer::from_raw(self.width, self.height, self.data.clone())
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Invalid buffer"))?;
+                .ok_or_else(|| std::io::Error::other("Invalid buffer"))?;
 
         buffer.save(path)?;
 
         Ok(())
+    }
+
+    /// Creates a new Image from width, height, and a data buffer (must be RGBA, width*height*4 bytes).
+    pub fn new(width: u32, height: u32, data: Vec<u8>) -> Result<Self> {
+        if data.len() != (width as usize) * (height as usize) * 4 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Data buffer length does not match width * height * 4",
+            )
+            .into());
+        }
+
+        Ok(Image {
+            width,
+            height,
+            data,
+        })
     }
 
     /// Displays the image (as RGBA8) in a window until Escape is pressed.
@@ -98,7 +116,7 @@ impl Image {
     pub fn get_pixel(&self, position: [u32; 2]) -> Result<[u8; 4]> {
         let dims = self.dimensions();
         if position[0] >= dims[0] || position[1] >= dims[1] {
-            return Err(Error::OutOfBounds(format!(
+            return Err(CoreError::OutOfBounds(format!(
                 "The image dimensions are {dims:?}. Getting pixel {position:?} is not possible."
             )));
         }
@@ -117,7 +135,7 @@ impl Image {
     pub fn set_pixel(&mut self, position: [u32; 2], color: [u8; 4]) -> Result<()> {
         let dims = self.dimensions();
         if position[0] >= dims[0] || position[1] >= dims[1] {
-            return Err(Error::OutOfBounds(format!(
+            return Err(CoreError::OutOfBounds(format!(
                 "The image dimensions are {dims:?}. Setting pixel {position:?} is not possible."
             )));
         }
@@ -132,7 +150,7 @@ impl Image {
     pub fn alpha_blend_pixel(&mut self, position: [u32; 2], color: [u8; 4]) -> Result<()> {
         let dims = self.dimensions();
         if position[0] >= dims[0] || position[1] >= dims[1] {
-            return Err(Error::OutOfBounds(format!(
+            return Err(CoreError::OutOfBounds(format!(
                 "The image dimensions are {dims:?}. Setting pixel {position:?} is not possible."
             )));
         }
@@ -159,6 +177,6 @@ impl Image {
 
     /// Returns the image dimensions as (width, height).
     pub fn dimensions(&self) -> [u32; 2] {
-        return [self.width, self.height];
+        [self.width, self.height]
     }
 }
