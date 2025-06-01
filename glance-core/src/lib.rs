@@ -32,17 +32,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // Convert to grayscale
-    #[test]
-    fn cvt_grayscale() -> Result<()> {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("../media/test_imgs/eye_orange.png");
-
-        let img = Image::open(&path)?.into_grayscale()?;
-        assert!(!img.is_empty());
-        Ok(())
-    }
-
     // Draw a point in the center of an image
     #[test]
     fn draw_shapes() -> Result<()> {

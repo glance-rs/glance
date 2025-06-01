@@ -1,17 +1,16 @@
 //! A high-level image handling module
 //!
-//! This crate provides an [`Image`] struct that wraps [`image::DynamicImage`] (from the [`image`]
-//! crate) with additional functionality for display and basic image operations.
+//! This crate provides an [`Image`] struct that can open, display and save images.
 
 use crate::drawing::traits::Drawable;
 use crate::utils;
 use crate::{Error, Result};
 
-use image::{DynamicImage, EncodableLayout, GenericImage, GenericImageView, Rgba};
+use image::{ImageBuffer, ImageReader, Rgba};
 use minifb::{Key, Window, WindowOptions};
 use std::path::Path;
 
-/// A wrapper around dynamic image data with display capabilities
+/// A struct that provides image handling functionality
 ///
 /// # Examples
 ///
@@ -24,7 +23,9 @@ use std::path::Path;
 /// }
 /// ```
 pub struct Image {
-    image: DynamicImage,
+    width: u32,
+    height: u32,
+    data: Vec<u8>,
 }
 
 impl Image {
@@ -33,8 +34,28 @@ impl Image {
     /// Returns an error if the file does not exist or cannot be decoded.
     /// Supports all formats recognized by the `image` crate.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let image = image::open(path)?;
-        Ok(Image { image })
+        let dyn_img = ImageReader::open(path)?.decode()?;
+        let rgba = dyn_img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+        Ok(Image {
+            width,
+            height,
+            data: rgba.into_raw(),
+        })
+    }
+
+    /// Opens an image from the given path.
+    ///
+    /// Returns an error if the file does not exist or cannot be decoded.
+    /// Supports all formats recognized by the `image` crate.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let buffer: ImageBuffer<Rgba<u8>, _> =
+            ImageBuffer::from_raw(self.width, self.height, self.data.clone())
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Invalid buffer"))?;
+
+        buffer.save(path)?;
+
+        Ok(())
     }
 
     /// Displays the image (as RGBA8) in a window until Escape is pressed.
@@ -59,8 +80,7 @@ impl Image {
         window.set_target_fps(1);
 
         // Populate framebuffer
-        let rgba_image = self.image.to_rgba8();
-        let rgba_bytes: &[u8] = rgba_image.as_bytes();
+        let rgba_bytes: &[u8] = &self.data;
         let mut buffer: Vec<u32> = Vec::with_capacity(rgba_bytes.len() / 4);
         for chunk in rgba_bytes.chunks(4) {
             buffer.push(u32::from_be_bytes([chunk[3], chunk[0], chunk[1], chunk[2]]));
@@ -82,7 +102,14 @@ impl Image {
             )));
         }
 
-        Ok(self.image.get_pixel(position[0], position[1]).0)
+        let idx = ((position[1] * dims[0] + position[0]) * 4) as usize;
+        let pixel = [
+            self.data[idx],
+            self.data[idx + 1],
+            self.data[idx + 2],
+            self.data[idx + 3],
+        ];
+        Ok(pixel)
     }
 
     /// Sets a pixel to the given color. Top left is treated as origin, x-axis goes horizontally.
@@ -94,7 +121,9 @@ impl Image {
             )));
         }
 
-        self.image.put_pixel(position[0], position[1], Rgba(color));
+        let idx = ((position[1] * dims[0] + position[0]) * 4) as usize;
+        self.data[idx..idx + 4].copy_from_slice(&color);
+
         Ok(())
     }
 
@@ -111,8 +140,7 @@ impl Image {
         let color_bg = self.get_pixel(position)?;
         let blend_color = utils::alpha_blend(color_fg, color_bg);
 
-        self.image
-            .put_pixel(position[0], position[1], Rgba(blend_color));
+        self.set_pixel(position, blend_color)?;
 
         Ok(())
     }
@@ -123,20 +151,13 @@ impl Image {
         Ok(())
     }
 
-    /// Returns a grayscaled image
-    pub fn into_grayscale(&self) -> Result<Self> {
-        Ok(Image {
-            image: self.image.grayscale(),
-        })
-    }
-
     /// Returns true if the image contains no pixel data.
     pub fn is_empty(&self) -> bool {
-        self.image.to_rgba8().is_empty()
+        self.data.is_empty()
     }
 
     /// Returns the image dimensions as (width, height).
     pub fn dimensions(&self) -> [u32; 2] {
-        self.image.dimensions().into()
+        return [self.width, self.height];
     }
 }
