@@ -9,6 +9,8 @@ pub enum Error {
 
     #[from]
     Minifb(minifb::Error),
+
+    OutOfBounds(String),
 }
 
 impl core::fmt::Display for Error {

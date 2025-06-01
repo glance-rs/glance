@@ -3,9 +3,11 @@
 //! This crate provides an [`Image`] struct that wraps [`image::DynamicImage`] (from the [`image`]
 //! crate) with additional functionality for display and basic image operations.
 
-use crate::Result;
+use crate::drawing::traits::Drawable;
+use crate::utils;
+use crate::{Error, Result};
 
-use image::{DynamicImage, EncodableLayout, GenericImageView};
+use image::{DynamicImage, EncodableLayout, GenericImage, GenericImageView, Rgba};
 use minifb::{Key, Window, WindowOptions};
 use std::path::Path;
 
@@ -40,8 +42,9 @@ impl Image {
     /// The window runs at 1 FPS to minimize CPU usage.
     /// Uses `minifb` for cross-platform windowing.
     pub fn display(&self, title: &str) -> Result<()> {
-        let width = self.dimensions().0 as usize;
-        let height = self.dimensions().1 as usize;
+        let dims = self.dimensions();
+        let width = dims[0] as usize;
+        let height = dims[1] as usize;
 
         // Create window
         let mut window = Window::new(
@@ -70,6 +73,57 @@ impl Image {
         Ok(())
     }
 
+    /// Gets the color of a pixel. Top left is treated as origin, x-axis goes horizontally.
+    pub fn get_pixel(&self, position: [u32; 2]) -> Result<[u8; 4]> {
+        let dims = self.dimensions();
+        if position[0] >= dims[0] || position[1] >= dims[1] {
+            return Err(Error::OutOfBounds(format!(
+                "The image dimensions are {dims:?}. Getting pixel {position:?} is not possible."
+            )));
+        }
+
+        Ok(self.image.get_pixel(position[0], position[1]).0)
+    }
+
+    /// Sets a pixel to the given color. Top left is treated as origin, x-axis goes horizontally.
+    pub fn set_pixel(&mut self, position: [u32; 2], color: [u8; 4]) -> Result<()> {
+        let dims = self.dimensions();
+        if position[0] >= dims[0] || position[1] >= dims[1] {
+            return Err(Error::OutOfBounds(format!(
+                "The image dimensions are {dims:?}. Setting pixel {position:?} is not possible."
+            )));
+        }
+
+        self.image.put_pixel(position[0], position[1], Rgba(color));
+        Ok(())
+    }
+
+    /// Linearly interpolate a pixel color with the given color
+    pub fn alpha_blend_pixel(&mut self, position: [u32; 2], color: [u8; 4]) -> Result<()> {
+        let dims = self.dimensions();
+        if position[0] >= dims[0] || position[1] >= dims[1] {
+            return Err(Error::OutOfBounds(format!(
+                "The image dimensions are {dims:?}. Setting pixel {position:?} is not possible."
+            )));
+        }
+
+        let color_fg = color;
+        let color_bg = self.get_pixel(position)?;
+        let blend_color = utils::alpha_blend(color_fg, color_bg);
+
+        self.image
+            .put_pixel(position[0], position[1], Rgba(blend_color));
+
+        Ok(())
+    }
+
+    /// Draw a shape (any struct that implements the [`drawing::traits::Drawable`] trait)
+    pub fn draw<D: Drawable>(&mut self, shape: D) -> Result<()> {
+        shape.draw_on(self)?;
+        Ok(())
+    }
+
+    /// Returns a grayscaled image
     pub fn into_grayscale(&self) -> Result<Self> {
         Ok(Image {
             image: self.image.grayscale(),
@@ -78,11 +132,11 @@ impl Image {
 
     /// Returns true if the image contains no pixel data.
     pub fn is_empty(&self) -> bool {
-        self.image.to_rgb8().is_empty()
+        self.image.to_rgba8().is_empty()
     }
 
     /// Returns the image dimensions as (width, height).
-    pub fn dimensions(&self) -> (u32, u32) {
-        self.image.dimensions()
+    pub fn dimensions(&self) -> [u32; 2] {
+        self.image.dimensions().into()
     }
 }

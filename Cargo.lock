@@ -423,6 +423,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "glance"
+version = "0.1.0"
+dependencies = [
+ "glance-core",
+]
+
+[[package]]
 name = "glance-core"
 version = "0.1.0"
 dependencies = [
