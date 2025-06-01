@@ -8,7 +8,10 @@ pub use self::error::{Error, Result};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{drawing::shapes::Circle, img::Image};
+    use crate::{
+        drawing::shapes::{AABB, Circle},
+        img::Image,
+    };
     use std::path::PathBuf;
 
     // Test with a real image file
@@ -42,7 +45,7 @@ mod tests {
 
     // Draw a point in the center of an image
     #[test]
-    fn draw_point() -> Result<()> {
+    fn draw_shapes() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/eye_orange.png");
 
@@ -51,11 +54,22 @@ mod tests {
 
         let center = [dims[0] / 2, dims[1] / 2];
         let green = [0, 255, 0, 150];
+        let blue = [0, 0, 255, 155];
 
         img.draw(Circle {
             position: center,
             color: green,
             radius: 100,
+            filled: true,
+            thickness: 5,
+        })?;
+
+        img.draw(AABB {
+            position: [center[0] - 100, center[1] - 100],
+            color: blue,
+            size: [200, 200],
+            thickness: 2,
+            filled: false,
         })?;
 
         assert!(img.get_pixel(center)? == green);
@@ -64,7 +78,7 @@ mod tests {
 
     // Draw a point out of bounds, should still pass, as shape may be partially visible
     #[test]
-    fn draw_invalid_point() -> Result<()> {
+    fn draw_partially_out_of_bounds_shape() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/eye_orange.png");
 
@@ -77,9 +91,12 @@ mod tests {
         img.draw(Circle {
             position: center,
             color: green,
-            radius: 1,
+            radius: 100,
+            filled: false,
+            thickness: 5,
         })?;
 
+        assert!(img.get_pixel([dims[0] - 1, dims[1] - 1])? == [0, 0, 0, 0]);
         Ok(())
     }
 }
