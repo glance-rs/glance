@@ -2,6 +2,11 @@
 name = "glance-core"
 version = "0.1.0"
 edition = "2024"
+authors = ["Wahid Khan <wk170179@gmail.com>", "Moulik Agarwal <moulik.agarwal@gmail.com"]
+description = "A high-level core library for image IO, display, and drawing operations."
+license = "GPL-3.0"
+keywords = ["image", "graphics", "display"]
+categories = ["graphics", "computer-vision", "visualization", "multimedia::images"]
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["from"] }
