@@ -43,6 +43,16 @@
           rustToolchain
           pkg-config
           rust-analyzer
+          wayland
+          wayland-protocols
+          libxkbcommon
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXrandr
+          xorg.libXi
+          xorg.libXext
+          xorg.libXrender
+          xorg.libxcb
         ];
 
         env = {
