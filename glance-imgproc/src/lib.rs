@@ -15,6 +15,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn grayscale_image() -> Result<()> {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("../media/test_imgs/lichtenstein.png");
+
+        let img = Image::open(&path)?;
+        let img = img.grayscale();
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("grayscale_image")?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn invert_image() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/flower.jpg");
@@ -42,6 +57,21 @@ mod tests {
 
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("threshold_image")?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn hist_equalize_image() -> Result<()> {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("../media/test_imgs/lichtenstein.png");
+
+        let img = Image::open(&path).unwrap();
+        let img = img.grayscale().histrogram_equalize();
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("hist_equalize_image")?;
         }
 
         Ok(())
