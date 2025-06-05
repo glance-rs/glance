@@ -16,6 +16,8 @@ pub enum CoreError {
 
     #[from]
     Io(io::Error),
+
+    InvalidCast(String),
 }
 
 impl core::fmt::Display for CoreError {
