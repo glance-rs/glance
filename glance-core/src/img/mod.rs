@@ -36,6 +36,15 @@ impl<P> Image<P>
 where
     P: Pixel,
 {
+    /// Creates a new empty [`Image`] instance with the specified width and height.
+    pub fn new(width: usize, height: usize) -> Self {
+        Image {
+            width,
+            height,
+            data: vec![P::from_rgba8([0, 0, 0, 0]).unwrap(); width * height],
+        }
+    }
+
     /// Creates a new [`Image`] instance from the given path.
     pub fn open<Pth: AsRef<Path>>(path: Pth) -> Result<Self> {
         let image = ImageReader::open(path)?.decode()?.to_rgba8();
@@ -84,7 +93,7 @@ where
                 ..Default::default()
             },
         )?;
-        window.set_target_fps(1);
+        window.set_target_fps(30);
 
         // Populate framebuffer
         let rgba8_data: Vec<[u8; 4]> = self.data.iter().map(|px| px.to_rgba8()).collect();
