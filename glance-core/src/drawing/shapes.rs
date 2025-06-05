@@ -1,14 +1,17 @@
 use super::traits::Drawable;
-use crate::Result;
+use crate::{
+    Result,
+    img::{Image, pixel::Pixel},
+};
 
 /// A circle shape that can be drawn onto an image.
 /// Can be either filled or drawn as an outline with a specified thickness.
 /// The color is specified in RGBA8 format.
-pub struct Circle {
+pub struct Circle<P: Pixel> {
     /// Center of the circle (x, y)
-    pub position: [u32; 2],
-    /// Color in RGBA8 format
-    pub color: [u8; 4],
+    pub position: (usize, usize),
+    /// Color as a struct that implements Pixel (like [`Rgba`], [`Luma`])
+    pub color: P,
     /// Radius in pixels
     pub radius: u32,
     /// Fill the shape (true) or draw outline (false)
@@ -17,9 +20,12 @@ pub struct Circle {
     pub thickness: u32,
 }
 
-impl Drawable for Circle {
-    fn draw_on(&self, image: &mut crate::img::Image) -> Result<()> {
-        let (cx, cy) = (self.position[0] as i32, self.position[1] as i32);
+impl<P> Drawable<P> for Circle<P>
+where
+    P: Pixel,
+{
+    fn draw_on(&self, image: &mut Image<P>) -> Result<()> {
+        let (cx, cy) = (self.position.0 as i32, self.position.1 as i32);
         let radius = self.radius as i32;
         let thickness = self.thickness as i32;
         let dims = image.dimensions();
@@ -38,8 +44,8 @@ impl Drawable for Circle {
                     continue;
                 }
 
-                let (nx, ny) = (nx as u32, ny as u32);
-                if nx >= dims[0] || ny >= dims[1] {
+                let (nx, ny) = (nx as usize, ny as usize);
+                if nx >= dims.0 || ny >= dims.1 {
                     continue;
                 }
 
@@ -51,7 +57,7 @@ impl Drawable for Circle {
                 };
 
                 if draw_pixel {
-                    image.alpha_blend_pixel([nx, ny], self.color)?;
+                    image.set_pixel((nx, ny), self.color)?;
                 }
             }
         }
@@ -62,25 +68,28 @@ impl Drawable for Circle {
 /// An axis aligned bounding box that can be drawn onto an image.
 /// Can be either filled or drawn as an outline with a specified thickness.
 /// The color is specified in RGBA8 format.
-pub struct AABB {
+pub struct AABB<P: Pixel> {
     /// Top-left corner (x, y)
-    pub position: [u32; 2],
+    pub position: (usize, usize),
     /// Size as [width, height]
-    pub size: [u32; 2],
+    pub size: (usize, usize),
     /// Color in RGBA8 format
-    pub color: [u8; 4],
+    pub color: P,
     /// Fill the shape (true) or draw outline (false)
     pub filled: bool,
     /// Outline thickness (only used when `filled = false`)
     pub thickness: u32,
 }
 
-impl Drawable for AABB {
-    fn draw_on(&self, image: &mut crate::img::Image) -> Result<()> {
-        let (cx, cy) = (self.position[0] as i32, self.position[1] as i32);
+impl<P> Drawable<P> for AABB<P>
+where
+    P: Pixel,
+{
+    fn draw_on(&self, image: &mut Image<P>) -> Result<()> {
+        let (cx, cy) = (self.position.0 as i32, self.position.1 as i32);
         let dims = image.dimensions();
-        let width = self.size[0] as i32;
-        let height = self.size[1] as i32;
+        let width = self.size.0 as i32;
+        let height = self.size.1 as i32;
         let thickness = self.thickness as i32;
 
         let left_x = cx - thickness;
@@ -96,10 +105,10 @@ impl Drawable for AABB {
                     continue;
                 }
 
-                let nx = x as u32;
-                let ny = y as u32;
+                let nx = x as usize;
+                let ny = y as usize;
 
-                if nx >= dims[0] || ny >= dims[1] {
+                if nx >= dims.0 || ny >= dims.1 {
                     continue;
                 }
 
@@ -112,7 +121,7 @@ impl Drawable for AABB {
                     self.filled || on_left_edge || on_right_edge || on_top_edge || on_bottom_edge;
 
                 if draw_pixel {
-                    image.alpha_blend_pixel([nx, ny], self.color)?;
+                    image.set_pixel((nx, ny), self.color)?;
                 }
             }
         }
@@ -123,21 +132,24 @@ impl Drawable for AABB {
 
 /// A line that can be drawn onto an image. Uses a square brush (Bresenham's algorithm).
 /// The color is specified in RGBA8 format.
-pub struct Line {
+pub struct Line<P: Pixel> {
     /// Start point (x, y)
-    pub start: [u32; 2],
+    pub start: (usize, usize),
     /// End point (x, y)
-    pub end: [u32; 2],
+    pub end: (usize, usize),
     /// Color in RGBA8 format
-    pub color: [u8; 4],
+    pub color: P,
     /// Line segment thickness (only used when `filled = false`)
     pub thickness: u32,
 }
 
-impl Drawable for Line {
-    fn draw_on(&self, image: &mut crate::img::Image) -> Result<()> {
-        let [x0, y0] = self.start;
-        let [x1, y1] = self.end;
+impl<P> Drawable<P> for Line<P>
+where
+    P: Pixel,
+{
+    fn draw_on(&self, image: &mut Image<P>) -> Result<()> {
+        let (x0, y0) = self.start;
+        let (x1, y1) = self.end;
 
         let dims = image.dimensions();
 
@@ -169,12 +181,12 @@ impl Drawable for Line {
                         continue;
                     }
 
-                    let (nx, ny) = (nx as u32, ny as u32);
-                    if nx >= dims[0] || ny >= dims[1] {
+                    let (nx, ny) = (nx as usize, ny as usize);
+                    if nx >= dims.0 || ny >= dims.1 {
                         continue;
                     }
 
-                    image.alpha_blend_pixel([nx, ny], self.color)?;
+                    image.set_pixel((nx, ny), self.color)?;
                 }
             }
 

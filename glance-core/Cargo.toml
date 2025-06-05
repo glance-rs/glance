@@ -12,4 +12,5 @@ categories = ["graphics", "computer-vision", "visualization", "multimedia::image
 derive_more = { version = "2.0.1", features = ["from"] }
 image = "0.25.6"
 minifb = { version = "0.28.0", features = ["wayland"] }
+num-traits = "0.2.19"
 rayon = "1.10.0"

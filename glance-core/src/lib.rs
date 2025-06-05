@@ -1,26 +1,26 @@
 pub mod drawing;
 mod error;
 pub mod img;
-pub(crate) mod utils;
 
 pub use self::error::{CoreError, Result};
 
 #[cfg(test)]
 mod tests {
+    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+
     use super::*;
-    use crate::{
-        drawing::shapes::{AABB, Circle, Line},
-        img::Image,
-    };
+    use crate::drawing::shapes::Circle;
+    use crate::img::Image;
+    use crate::img::pixel::{Luma, Rgba};
     use std::path::PathBuf;
 
-    // Test with a real image file
+    // Open an image
     #[test]
     fn open_valid_image() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("../media/test_imgs/eye.png");
+        path.push("../media/test_imgs/lichtenstein.png");
 
-        let img = Image::open(&path)?;
+        let img: Image<Rgba<u8>> = Image::open(&path)?;
 
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("open_valid_image")?;
@@ -30,14 +30,14 @@ mod tests {
         Ok(())
     }
 
-    // Test error case for missing file
+    // Open an invalid image path
     #[test]
     fn open_invalid_path() {
-        let result = Image::open("non_existent_file.jpg");
+        let result = Image::<Rgba<u8>>::open("non_existent_file.jpg");
         assert!(result.is_err());
     }
 
-    // Draw a point in the center of an image
+    // Draw shapes on an image
     #[test]
     fn draw_shapes() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -46,9 +46,13 @@ mod tests {
         let mut img = Image::open(&path)?;
         let dims = img.dimensions();
 
-        let center = [dims[0] / 2, dims[1] / 2];
-        let green = [0, 255, 0, 150];
-        let blue = [0, 0, 255, 155];
+        let center = (dims.0 / 2, dims.1 / 2);
+        let green = Rgba {
+            r: 0u8,
+            g: 255u8,
+            b: 0u8,
+            a: 150u8,
+        };
 
         img.draw(Circle {
             position: center,
@@ -58,34 +62,37 @@ mod tests {
             thickness: 5,
         })?;
 
-        img.draw(AABB {
-            position: [center[0] - 100, center[1] - 100],
-            color: blue,
-            size: [200, 200],
-            thickness: 2,
-            filled: false,
-        })?;
-
-        img.draw(Circle {
-            position: center,
-            color: blue,
-            radius: 150,
-            filled: false,
-            thickness: 8,
-        })?;
-
-        img.draw(Line {
-            start: [0, 0],
-            end: [256, 500],
-            color: [120, 120, 200, 255],
-            thickness: 2,
-        })?;
-
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("draw_shapes")?;
         }
 
-        assert!(img.get_pixel(center)? == green);
+        assert!(img.get_pixel(center.into())? == &green);
+        Ok(())
+    }
+
+    // Convert an image to grayscale by making use of parallel iterators
+    #[test]
+    fn cvt_grayscale() -> Result<()> {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("../media/test_imgs/lichtenstein.png");
+
+        let mut img = Image::<Rgba<u8>>::open(&path)?;
+        img.par_pixels_mut().for_each(|pixel| {
+            let (r, g, b, _) = (pixel.r, pixel.g, pixel.b, pixel.a);
+            let l = 0.299f32 * r as f32 + 0.587f32 * g as f32 + 0.114f32 * b as f32;
+            let l = l as u8;
+            *pixel = Rgba {
+                r: l,
+                g: l,
+                b: l,
+                a: l,
+            };
+        });
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("cvt_grayscale")?;
+        }
+
         Ok(())
     }
 
@@ -95,11 +102,22 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/eye_orange.png");
 
-        let mut img = Image::open(&path)?;
-        let dims = img.dimensions();
+        let mut img = Image::<Rgba<u8>>::open(&path)?;
+        let center = img.dimensions();
 
-        let center = [dims[0], dims[1]];
-        let green = [0, 255, 0, 255];
+        let green = Rgba {
+            r: 0u8,
+            g: 255u8,
+            b: 0u8,
+            a: 150u8,
+        };
+
+        let black = Rgba {
+            r: 0u8,
+            g: 0u8,
+            b: 0u8,
+            a: 0u8,
+        };
 
         img.draw(Circle {
             position: center,
@@ -113,7 +131,28 @@ mod tests {
             img.display("draw_partially_out_of_bounds_shape")?;
         }
 
-        assert!(img.get_pixel([dims[0] - 1, dims[1] - 1])? == [0, 0, 0, 0]);
+        assert!(img.get_pixel((center.0 - 1, center.1 - 1))? == &black);
+        Ok(())
+    }
+
+    // Create a Luma image and convert it to RGBA8
+    #[test]
+    fn create_luma_image_and_convert() -> Result<()> {
+        let mut img = Image::<Luma<u8>>::new(512, 512);
+        img.par_pixels_mut().enumerate().for_each(|(idx, pixel)| {
+            let x = idx % 512;
+            let value = (x as f32 / 511.0 * 255.0) as u8;
+            *pixel = Luma { l: value };
+        });
+
+        assert!(!img.is_empty());
+        assert_eq!(img.dimensions(), (512, 512));
+        assert_eq!(img.get_pixel((0, 0))?.l, 0);
+        assert_eq!(img.get_pixel((511, 0))?.l, 255);
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("create_luma_image_and_convert")?;
+        }
+
         Ok(())
     }
 }

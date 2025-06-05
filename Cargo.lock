@@ -436,6 +436,7 @@ dependencies = [
  "derive_more",
  "image",
  "minifb",
+ "num-traits",
  "rayon",
 ]
 

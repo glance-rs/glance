@@ -1,106 +1,63 @@
-use rayon::{
-    iter::{IndexedParallelIterator, ParallelIterator},
-    slice::{ParallelSlice, ParallelSliceMut},
-};
+use super::{Image, pixel::Pixel};
+use rayon::prelude::*;
 
-use super::Image;
-
-pub struct PixelIter<'a> {
-    image: &'a Image,
-    idx: usize,
+pub struct PixelIter<'a, P: Pixel> {
+    iter: std::slice::Iter<'a, P>,
 }
 
-impl<'a> Iterator for PixelIter<'a> {
-    type Item = (usize, usize, [u8; 4]);
+impl<'a, P: Pixel> PixelIter<'a, P> {
+    pub fn new(image: &'a Image<P>) -> Self {
+        Self {
+            iter: image.data.iter(),
+        }
+    }
+}
+
+impl<'a, P: Pixel> Iterator for PixelIter<'a, P> {
+    type Item = P;
+
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx >= (self.image.width * self.image.height) as usize {
-            return None;
-        }
-        let x = self.idx % self.image.width as usize;
-        let y = self.idx / self.image.width as usize;
-        let base = self.idx * 4;
-        let px = [
-            self.image.data[base],
-            self.image.data[base + 1],
-            self.image.data[base + 2],
-            self.image.data[base + 3],
-        ];
-        self.idx += 1;
-        Some((x, y, px))
+        self.iter.next().copied()
     }
 }
 
-pub struct PixelIterMut<'a> {
-    image: &'a mut Image,
-    idx: usize,
+pub struct PixelIterMut<'a, P: Pixel> {
+    iter: std::slice::IterMut<'a, P>,
 }
 
-impl<'a> Iterator for PixelIterMut<'a> {
-    type Item = (usize, usize, &'a mut [u8; 4]);
+impl<'a, P: Pixel> PixelIterMut<'a, P> {
+    pub fn new(image: &'a mut Image<P>) -> Self {
+        Self {
+            iter: image.data.iter_mut(),
+        }
+    }
+}
+
+impl<'a, P: Pixel> Iterator for PixelIterMut<'a, P> {
+    type Item = &'a mut P;
+
     fn next(&mut self) -> Option<Self::Item> {
-        let width = self.image.width as usize;
-        let height = self.image.height as usize;
-        if self.idx >= width * height {
-            return None;
-        }
-        let x = self.idx % width;
-        let y = self.idx / width;
-        let base = self.idx * 4;
-
-        // Each pixel here is only yielded once. So this is safe.
-        let pixel = unsafe {
-            let ptr = self.image.data.as_mut_ptr().add(base) as *mut [u8; 4];
-            &mut *ptr
-        };
-
-        self.idx += 1;
-        Some((x, y, pixel))
+        self.iter.next()
     }
 }
 
-impl Image {
-    pub fn pixels(&self) -> PixelIter<'_> {
-        PixelIter {
-            image: self,
-            idx: 0,
-        }
+impl<P> Image<P>
+where
+    P: Pixel,
+{
+    pub fn pixels(&self) -> PixelIter<P> {
+        PixelIter::new(self)
     }
 
-    pub fn pixels_mut(&mut self) -> PixelIterMut<'_> {
-        PixelIterMut {
-            image: self,
-            idx: 0,
-        }
+    pub fn pixels_mut(&mut self) -> PixelIterMut<P> {
+        PixelIterMut::new(self)
     }
 
-    pub fn par_pixels(&self) -> impl ParallelIterator<Item = (usize, usize, [u8; 4])> {
-        let width = self.width as usize;
-        self.data
-            .par_chunks_exact(4)
-            .enumerate()
-            .map(move |(idx, chunk)| {
-                let x = idx % width;
-                let y = idx / width;
-                let pixel = [chunk[0], chunk[1], chunk[2], chunk[3]];
-                (x, y, pixel)
-            })
+    pub fn par_pixels(&self) -> rayon::slice::Iter<'_, P> {
+        self.data.par_iter()
     }
 
-    pub fn par_pixels_mut(&mut self) -> impl ParallelIterator<Item = (usize, usize, &mut [u8; 4])> {
-        let width = self.width as usize;
-
-        self.data
-            .par_chunks_exact_mut(4)
-            .enumerate()
-            .map(move |(idx, chunk)| {
-                let x = idx % width;
-                let y = idx / width;
-
-                // Chunk is exactly 4 bytes (from par_chunks_exact_mut),
-                // and Rayon ensures chunks are disjoint so it's safe to cast to &mut [u8; 4]
-                let pixel = unsafe { &mut *(chunk.as_mut_ptr() as *mut [u8; 4]) };
-
-                (x, y, pixel)
-            })
+    pub fn par_pixels_mut(&mut self) -> rayon::slice::IterMut<'_, P> {
+        self.data.par_iter_mut()
     }
 }
