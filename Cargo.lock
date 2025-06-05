@@ -424,14 +424,15 @@ dependencies = [
 
 [[package]]
 name = "glance"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "glance-core",
+ "glance-imgproc",
 ]
 
 [[package]]
 name = "glance-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "derive_more",
  "image",
