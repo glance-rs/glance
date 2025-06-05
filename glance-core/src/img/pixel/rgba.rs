@@ -15,7 +15,7 @@ pub struct Rgba<T> {
 
 impl<T> Pixel for Rgba<T>
 where
-    T: Copy + Primitive + NumCast + AsPrimitive<f32> + PartialEq + 'static,
+    T: Copy + Primitive + NumCast + AsPrimitive<f32> + PartialEq + Send + Sync + 'static,
 {
     type Subpixel = T;
     fn channel_count() -> usize {
@@ -27,6 +27,7 @@ where
     }
 
     fn from_rgba8(rgba: [u8; 4]) -> Result<Self> {
+        // Scale factor from u8's range to T's range
         let scale = T::max_bound() / u8::max_bound();
         let convert_channel = |value: u8| -> Result<T> {
             let scaled = value as f32 * scale;
@@ -44,7 +45,7 @@ where
     }
 
     fn to_rgba8(&self) -> [u8; 4] {
-        // Scale factor from T range to u8 range
+        // Scale factor from T's range to u8's range
         let scale = u8::max_bound() / T::max_bound();
 
         // Helper function to convert each channel

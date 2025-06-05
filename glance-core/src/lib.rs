@@ -6,13 +6,15 @@ pub use self::error::{CoreError, Result};
 
 #[cfg(test)]
 mod tests {
+    use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
     use super::*;
     use crate::drawing::shapes::Circle;
     use crate::img::Image;
-    use crate::img::pixel::Rgba;
+    use crate::img::pixel::{Luma, Rgba};
     use std::path::PathBuf;
 
-    // Test with a real image file
+    // Open an image
     #[test]
     fn open_valid_image() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -24,11 +26,11 @@ mod tests {
             img.display("open_valid_image")?;
         }
 
-        //assert!(!img.is_empty());
+        assert!(!img.is_empty());
         Ok(())
     }
 
-    // Draw a point in the center of an image
+    // Draw shapes on an image
     #[test]
     fn draw_shapes() -> Result<()> {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -58,6 +60,31 @@ mod tests {
         }
 
         assert!(img.get_pixel(center.into())? == &green);
+        Ok(())
+    }
+
+    #[test]
+    fn cvt_grayscale() -> Result<()> {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("../media/test_imgs/lichtenstein.png");
+
+        let mut img = Image::<Rgba<u8>>::open(&path)?;
+        img.par_pixels_mut().for_each(|pixel| {
+            let (r, g, b, _) = (pixel.r, pixel.g, pixel.b, pixel.a);
+            let l = 0.299f32 * r as f32 + 0.587f32 * g as f32 + 0.114f32 * b as f32;
+            let l = l as u8;
+            *pixel = Rgba {
+                r: l,
+                g: l,
+                b: l,
+                a: l,
+            };
+        });
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.display("cvt_grayscale")?;
+        }
+
         Ok(())
     }
 }

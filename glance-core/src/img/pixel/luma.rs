@@ -12,7 +12,7 @@ pub struct Luma<T> {
 
 impl<T> Pixel for Luma<T>
 where
-    T: PartialEq + Copy + Primitive + NumCast + AsPrimitive<f32> + 'static,
+    T: Copy + Primitive + NumCast + AsPrimitive<f32> + PartialEq + Send + Sync + 'static,
 {
     type Subpixel = T;
     fn channel_count() -> usize {

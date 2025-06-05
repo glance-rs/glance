@@ -1,6 +1,8 @@
+//! This module provides traits and types for working with different pixel formats
+//! It assumes a base pixel format of RGBA8, and allows conversion to and from that format.
 use crate::Result;
 
-pub trait Pixel: PartialEq + Copy + Clone + 'static {
+pub trait Pixel: PartialEq + Copy + Clone + Send + Sync + 'static {
     type Subpixel: Copy + 'static;
 
     fn channel_count() -> usize;
