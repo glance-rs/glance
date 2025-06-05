@@ -1,6 +1,6 @@
 [package]
 name = "glance-core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Wahid Khan <wk170179@gmail.com>", "Moulik Agarwal <moulik.agarwal@gmail.com"]
 description = "A high-level core library for image IO, display, and drawing operations."
