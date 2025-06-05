@@ -446,6 +446,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "glance-core",
+ "num-traits",
  "rayon",
 ]
 

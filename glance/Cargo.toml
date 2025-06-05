@@ -9,4 +9,4 @@ keywords = ["image", "graphics", "display"]
 categories = ["graphics", "computer-vision", "visualization", "multimedia::images"]
 
 [dependencies]
-glance-core = { version = "0.2.0", path = "../glance-core" }
+glance-core = { version = "0.2.1", path = "../glance-core" }

@@ -45,6 +45,20 @@ where
         }
     }
 
+    /// Creates a new [`Image`] instance from the given width, height, and pixel data.
+    pub fn from_data(width: usize, height: usize, data: Vec<P>) -> Result<Self> {
+        if data.len() != width * height {
+            return Err(CoreError::InvalidData(
+                "Data length does not match width * height".to_string(),
+            ));
+        }
+        Ok(Image {
+            width,
+            height,
+            data,
+        })
+    }
+
     /// Creates a new [`Image`] instance from the given path.
     pub fn open<Pth: AsRef<Path>>(path: Pth) -> Result<Self> {
         let image = ImageReader::open(path)?.decode()?.to_rgba8();

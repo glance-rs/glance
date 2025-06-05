@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["from"] }
-glance-core = { version = "0.1.0", path = "../glance-core" }
+glance-core = { version = "0.2.1", path = "../glance-core" }
+num-traits = "0.2.19"
 rayon = "1.10.0"
 
