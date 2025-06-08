@@ -26,6 +26,7 @@ use pixel::{Pixel, Rgba};
 
 /// Image struct represents an image with pixel data of type P
 /// where P implements the [`Pixel`] trait.
+#[derive(Debug, Clone)]
 pub struct Image<P: Pixel> {
     width: usize,
     height: usize,
@@ -43,6 +44,20 @@ where
             height,
             data: vec![P::from_rgba8([0, 0, 0, 0]).unwrap(); width * height],
         }
+    }
+
+    /// Creates a new [`Image`] instance from the given width, height, and pixel data.
+    pub fn from_data(width: usize, height: usize, data: Vec<P>) -> Result<Self> {
+        if data.len() != width * height {
+            return Err(CoreError::InvalidData(
+                "Data length does not match width * height".to_string(),
+            ));
+        }
+        Ok(Image {
+            width,
+            height,
+            data,
+        })
     }
 
     /// Creates a new [`Image`] instance from the given path.
@@ -96,12 +111,17 @@ where
         window.set_target_fps(30);
 
         // Populate framebuffer
-        let rgba8_data: Vec<[u8; 4]> = self.data.iter().map(|px| px.to_rgba8()).collect();
-
-        let mut buffer: Vec<u32> = Vec::with_capacity(rgba8_data.len());
-        for pixel in rgba8_data.iter() {
-            buffer.push(u32::from_be_bytes([pixel[3], pixel[0], pixel[1], pixel[2]]));
-        }
+        let buffer: Vec<u32> = self
+            .data
+            .iter()
+            .map(|px| {
+                let rgba = px.to_rgba8();
+                if rgba[3] == 0 {
+                    return 0; // Transparent pixel
+                }
+                u32::from_be_bytes([rgba[3], rgba[0], rgba[1], rgba[2]])
+            })
+            .collect();
 
         while window.is_open() && !window.is_key_down(Key::Escape) {
             window.update_with_buffer(&buffer, width, height)?;
@@ -130,6 +150,12 @@ where
         let idx = position.1 * self.width + position.0;
         if let Some(px) = self.data.get_mut(idx) {
             *px = color;
+        } else {
+            return Err(CoreError::OutOfBounds(format!(
+                "{:#?} is out of bounds for image of size {:#?}",
+                position,
+                self.dimensions()
+            )));
         }
         Ok(())
     }
@@ -152,14 +178,17 @@ where
 
     /// Convert the image to RGBA8 format.
     pub fn to_rgba8(&self) -> Image<Rgba<u8>> {
-        let rgba_data: Vec<[u8; 4]> = self.data.iter().map(|px| px.to_rgba8()).collect();
-        let rgba_data: Vec<Rgba<u8>> = rgba_data
-            .into_iter()
-            .map(|rgba| Rgba {
-                r: rgba[0],
-                g: rgba[1],
-                b: rgba[2],
-                a: rgba[3],
+        let rgba_data: Vec<Rgba<u8>> = self
+            .data
+            .iter()
+            .map(|px| {
+                let rgba = px.to_rgba8();
+                Rgba {
+                    r: rgba[0],
+                    g: rgba[1],
+                    b: rgba[2],
+                    a: rgba[3],
+                }
             })
             .collect();
 
