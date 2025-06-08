@@ -76,4 +76,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn lerp_images() -> Result<()> {
+        let mut dir_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        dir_path.push("../media/test_imgs/");
+        let path1 = dir_path.join("lichtenstein.png");
+        let path2 = dir_path.join("pepper.bmp");
+
+        let img1 = Image::<Rgba<u8>>::open(path1)?;
+        let img2 = Image::<Rgba<u8>>::open(path2)?;
+
+        let lerp_img = img1.lerp(&img2, 1.0);
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            lerp_img.display("lerp_images")?;
+        }
+
+        Ok(())
+    }
 }

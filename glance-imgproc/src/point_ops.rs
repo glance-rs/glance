@@ -20,6 +20,7 @@ pub trait PointOpsExtRgba<T: Primitive> {
     fn gamma(self, gamma: f32) -> Self;
     fn grayscale(self) -> Image<Luma<T>>;
     //fn histrogram_equalize(self) -> Self;
+    fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>>;
 }
 
 /// Extension trait for [`glance_core::img::Image`] to provide point operations for Luma images
@@ -88,6 +89,32 @@ where
             .collect::<Vec<_>>();
 
         Image::from_data(width, height, gray_pixels).unwrap()
+    }
+
+    fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>> {
+        let (width, height) = self.dimensions();
+        if (width, height) != other.dimensions() {
+            panic!(
+                "Cannot lerp images of different dimensions: {:?} and {:?}",
+                (width, height),
+                other.dimensions()
+            );
+        }
+        let lerped_pixels = self
+            .pixels()
+            .zip(other.pixels())
+            .map(|(px1, px2)| Rgba {
+                r: T::from(px1.r.as_() * (1.0 - alpha) + px2.r.as_() * alpha)
+                    .expect("Failed to convert lerped value to T"),
+                g: T::from(px1.g.as_() * (1.0 - alpha) + px2.g.as_() * alpha)
+                    .expect("Failed to convert lerped value to T"),
+                b: T::from(px1.b.as_() * (1.0 - alpha) + px2.b.as_() * alpha)
+                    .expect("Failed to convert lerped value to T"),
+                a: T::from(T::max_bound()).expect("Failed to convert lerped value to T"),
+            })
+            .collect::<Vec<_>>();
+
+        Image::from_data(width, height, lerped_pixels).unwrap()
     }
 }
 

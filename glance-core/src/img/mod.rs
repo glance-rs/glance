@@ -115,6 +115,9 @@ where
             .iter()
             .map(|px| {
                 let rgba = px.to_rgba8();
+                if rgba[3] == 0 {
+                    return 0; // Transparent pixel
+                }
                 u32::from_be_bytes([rgba[3], rgba[0], rgba[1], rgba[2]])
             })
             .collect();
