@@ -21,6 +21,8 @@ pub trait PointOpsExtRgba<T: Primitive> {
     fn grayscale(self) -> Image<Luma<T>>;
     //fn histrogram_equalize(self) -> Self;
     fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>>;
+    fn brightness(self, brightness: f32) -> Image<Rgba<T>>;
+    fn contrast(self, contrast: f32) -> Image<Rgba<T>>;
 }
 
 /// Extension trait for [`glance_core::img::Image`] to provide point operations for Luma images
@@ -35,6 +37,7 @@ impl<T> PointOpsExtRgba<T> for Image<Rgba<T>>
 where
     T: Primitive,
 {
+    /// Inverts the colors of the image by subtracting each pixel's RGB values from the maximum value
     fn invert(mut self) -> Self {
         let max_value = T::from(T::max_bound()).expect("Failed to convert max bound to T");
         self.par_pixels_mut().for_each(|pixel| {
@@ -91,6 +94,8 @@ where
         Image::from_data(width, height, gray_pixels).unwrap()
     }
 
+    /// Linearly interpolates between two images of the same dimensions.
+    /// The alpha parameter controls the interpolation factor.
     fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>> {
         let (width, height) = self.dimensions();
         if (width, height) != other.dimensions() {
@@ -116,12 +121,53 @@ where
 
         Image::from_data(width, height, lerped_pixels).unwrap()
     }
+
+    /// Adjusts the brightness of the image by adding a value to each pixel's RGB channels.
+    /// The intensities are clamped to the maximum value of the pixel type `T`.
+    fn brightness(self, brightness: f32) -> Image<Rgba<T>> {
+        let (width, height) = self.dimensions();
+        let adjusted_pixels = self
+            .pixels()
+            .map(|pixel| Rgba {
+                r: T::from((pixel.r.as_() + brightness).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert brightness value to T"),
+                g: T::from((pixel.g.as_() + brightness).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert brightness value to T"),
+                b: T::from((pixel.b.as_() + brightness).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert brightness value to T"),
+                a: pixel.a, // Preserve alpha channel
+            })
+            .collect::<Vec<_>>();
+
+        Image::from_data(width, height, adjusted_pixels).unwrap()
+    }
+
+    /// Adjusts the contrast of the image by multiplying each pixel's RGB channels by a value.
+    /// The intensities are clamped to the maximum value of the pixel type `T`.
+    fn contrast(self, contrast: f32) -> Image<Rgba<T>> {
+        let (width, height) = self.dimensions();
+        let adjusted_pixels = self
+            .pixels()
+            .map(|pixel| Rgba {
+                r: T::from((pixel.r.as_() * contrast).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert contrast value to T"),
+                g: T::from((pixel.g.as_() * contrast).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert contrast value to T"),
+                b: T::from((pixel.b.as_() * contrast).clamp(0.0, T::max_bound()))
+                    .expect("Failed to convert brightness value to T"),
+                a: pixel.a, // Preserve alpha channel
+            })
+            .collect::<Vec<_>>();
+
+        Image::from_data(width, height, adjusted_pixels).unwrap()
+    }
 }
 
 impl<T> PointOpsExtLuma<T> for Image<Luma<T>>
 where
     T: Primitive,
 {
+    /// Inverts the colors of the image by subtracting each pixel's RGB values from the maximum value
     fn invert(mut self) -> Self {
         let max_value = T::from(T::max_bound()).expect("Failed to convert max bound to T");
         self.par_pixels_mut().for_each(|pixel| {
@@ -133,6 +179,7 @@ where
         self
     }
 
+    /// Returns an image with given gamma applied.
     fn gamma(mut self, gamma: f32) -> Self {
         let inv_gamma = 1.0 / gamma;
 

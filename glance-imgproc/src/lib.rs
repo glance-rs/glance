@@ -95,4 +95,20 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn brightness_contrast() -> Result<()> {
+        let mut dir_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        dir_path.push("../media/test_imgs/");
+        let path1 = dir_path.join("lichtenstein.png");
+
+        let img1 = Image::<Rgba<u8>>::open(path1)?;
+        let img1 = img1.contrast(1.9);
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img1.display("brightness_contrast")?;
+        }
+
+        Ok(())
+    }
 }

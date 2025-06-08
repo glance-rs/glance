@@ -26,6 +26,7 @@ use pixel::{Pixel, Rgba};
 
 /// Image struct represents an image with pixel data of type P
 /// where P implements the [`Pixel`] trait.
+#[derive(Debug, Clone)]
 pub struct Image<P: Pixel> {
     width: usize,
     height: usize,
