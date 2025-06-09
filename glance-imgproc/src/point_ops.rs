@@ -1,6 +1,6 @@
 use glance_core::img::{
     Image,
-    pixel::{Luma, Primitive, Rgba},
+    pixel::{Luma, Rgba},
 };
 use rayon::iter::ParallelIterator;
 
@@ -15,36 +15,32 @@ pub enum ThresholdType {
 }
 
 /// Extension trait for [`glance_core::img::Image`] to provide point operations for RGBA images
-pub trait PointOpsExtRgba<T: Primitive> {
+pub trait PointOpsExtRgba {
     fn invert(self) -> Self;
     fn gamma(self, gamma: f32) -> Self;
-    fn grayscale(self) -> Image<Luma<T>>;
+    fn grayscale(self) -> Image<Luma>;
     //fn histrogram_equalize(self) -> Self;
-    fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>>;
-    fn brightness(self, brightness: f32) -> Image<Rgba<T>>;
-    fn contrast(self, contrast: f32) -> Image<Rgba<T>>;
+    fn lerp(self, other: &Image<Rgba>, alpha: f32) -> Image<Rgba>;
+    fn brightness(self, brightness: f32) -> Image<Rgba>;
+    fn contrast(self, contrast: f32) -> Image<Rgba>;
 }
 
 /// Extension trait for [`glance_core::img::Image`] to provide point operations for Luma images
-pub trait PointOpsExtLuma<T: Primitive> {
+pub trait PointOpsExtLuma {
     fn invert(self) -> Self;
     fn gamma(self, gamma: f32) -> Self;
-    fn threshold(self, threshold: T, max_intensity: T, kind: ThresholdType) -> Image<Luma<T>>;
+    fn threshold(self, threshold: f32, max_intensity: f32, kind: ThresholdType) -> Image<Luma>;
     fn histrogram_equalize(self) -> Self;
 }
 
-impl<T> PointOpsExtRgba<T> for Image<Rgba<T>>
-where
-    T: Primitive,
-{
+impl PointOpsExtRgba for Image<Rgba> {
     /// Inverts the colors of the image by subtracting each pixel's RGB values from the maximum value
     fn invert(mut self) -> Self {
-        let max_value = T::from(T::max_bound()).expect("Failed to convert max bound to T");
         self.par_pixels_mut().for_each(|pixel| {
             *pixel = Rgba {
-                r: max_value - pixel.r,
-                g: max_value - pixel.g,
-                b: max_value - pixel.b,
+                r: 1.0 - pixel.r,
+                g: 1.0 - pixel.g,
+                b: 1.0 - pixel.b,
                 a: pixel.a, // Preserve alpha channel
             };
         });
@@ -58,13 +54,9 @@ where
         let inv_gamma = 1.0 / gamma;
 
         self.par_pixels_mut().for_each(|pixel| {
-            let r = T::from((pixel.r.as_() / T::max_bound()).powf(inv_gamma) * T::max_bound())
-                .expect("Failed to convert gamma value to T");
-            let g = T::from((pixel.g.as_() / T::max_bound()).powf(inv_gamma) * T::max_bound())
-                .expect("Failed to convert gamma value to T");
-            let b = T::from((pixel.b.as_() / T::max_bound()).powf(inv_gamma) * T::max_bound())
-                .expect("Failed to convert gamma value to T");
-
+            let r = pixel.r.powf(inv_gamma);
+            let g = pixel.g.powf(inv_gamma);
+            let b = pixel.b.powf(inv_gamma);
             *pixel = Rgba {
                 r,
                 g,
@@ -79,24 +71,22 @@ where
     /// Returns a grayscale image from the RGBA image. Weights are in accordance with the BT.601
     /// standard. The returned image maintains the prcision of the original image's pixel type, but with only
     /// one channel (luminance) (see [`Luma`]).
-    fn grayscale(self) -> Image<Luma<T>> {
+    fn grayscale(self) -> Image<Luma> {
         let (width, height) = self.dimensions();
         let gray_pixels = self
             .pixels()
             .map(|pixel| {
-                let intensity =
-                    (pixel.r.as_() * 0.299 + pixel.g.as_() * 0.587 + pixel.b.as_() * 0.114).round();
-                let intensity = T::from(intensity).expect("Failed to convert intensity to T");
+                let intensity = pixel.r * 0.299 + pixel.g * 0.587 + pixel.b * 0.114;
                 Luma { l: intensity }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         Image::from_data(width, height, gray_pixels).unwrap()
     }
 
     /// Linearly interpolates between two images of the same dimensions.
     /// The alpha parameter controls the interpolation factor.
-    fn lerp(self, other: &Image<Rgba<T>>, alpha: f32) -> Image<Rgba<T>> {
+    fn lerp(self, other: &Image<Rgba>, alpha: f32) -> Image<Rgba> {
         let (width, height) = self.dimensions();
         if (width, height) != other.dimensions() {
             panic!(
@@ -109,13 +99,10 @@ where
             .pixels()
             .zip(other.pixels())
             .map(|(px1, px2)| Rgba {
-                r: T::from(px1.r.as_() * (1.0 - alpha) + px2.r.as_() * alpha)
-                    .expect("Failed to convert lerped value to T"),
-                g: T::from(px1.g.as_() * (1.0 - alpha) + px2.g.as_() * alpha)
-                    .expect("Failed to convert lerped value to T"),
-                b: T::from(px1.b.as_() * (1.0 - alpha) + px2.b.as_() * alpha)
-                    .expect("Failed to convert lerped value to T"),
-                a: T::from(T::max_bound()).expect("Failed to convert lerped value to T"),
+                r: px1.r * (1.0 - alpha) + px2.r * alpha,
+                g: px1.g * (1.0 - alpha) + px2.g * alpha,
+                b: px1.b * (1.0 - alpha) + px2.b * alpha,
+                a: px1.a * (1.0 - alpha) + px2.a * alpha,
             })
             .collect::<Vec<_>>();
 
@@ -123,19 +110,16 @@ where
     }
 
     /// Adjusts the brightness of the image by adding a value to each pixel's RGB channels.
-    /// The intensities are clamped to the maximum value of the pixel type `T`.
-    fn brightness(self, brightness: f32) -> Image<Rgba<T>> {
+    /// The intensities are clamped to the [0.0, 1.0] range.
+    fn brightness(self, brightness: f32) -> Image<Rgba> {
         let (width, height) = self.dimensions();
         let adjusted_pixels = self
             .pixels()
             .map(|pixel| Rgba {
-                r: T::from((pixel.r.as_() + brightness).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert brightness value to T"),
-                g: T::from((pixel.g.as_() + brightness).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert brightness value to T"),
-                b: T::from((pixel.b.as_() + brightness).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert brightness value to T"),
-                a: pixel.a, // Preserve alpha channel
+                r: (pixel.r + brightness).clamp(0.0, 1.0),
+                g: (pixel.g + brightness).clamp(0.0, 1.0),
+                b: (pixel.b + brightness).clamp(0.0, 1.0),
+                a: pixel.a,
             })
             .collect::<Vec<_>>();
 
@@ -143,18 +127,15 @@ where
     }
 
     /// Adjusts the contrast of the image by multiplying each pixel's RGB channels by a value.
-    /// The intensities are clamped to the maximum value of the pixel type `T`.
-    fn contrast(self, contrast: f32) -> Image<Rgba<T>> {
+    /// The intensities are clamped to the [0.0, 1.0] range.
+    fn contrast(self, contrast: f32) -> Image<Rgba> {
         let (width, height) = self.dimensions();
         let adjusted_pixels = self
             .pixels()
             .map(|pixel| Rgba {
-                r: T::from((pixel.r.as_() * contrast).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert contrast value to T"),
-                g: T::from((pixel.g.as_() * contrast).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert contrast value to T"),
-                b: T::from((pixel.b.as_() * contrast).clamp(0.0, T::max_bound()))
-                    .expect("Failed to convert brightness value to T"),
+                r: (pixel.r * contrast).clamp(0.0, 1.0),
+                g: (pixel.g * contrast).clamp(0.0, 1.0),
+                b: (pixel.b * contrast).clamp(0.0, 1.0),
                 a: pixel.a, // Preserve alpha channel
             })
             .collect::<Vec<_>>();
@@ -163,17 +144,11 @@ where
     }
 }
 
-impl<T> PointOpsExtLuma<T> for Image<Luma<T>>
-where
-    T: Primitive,
-{
+impl PointOpsExtLuma for Image<Luma> {
     /// Inverts the colors of the image by subtracting each pixel's RGB values from the maximum value
     fn invert(mut self) -> Self {
-        let max_value = T::from(T::max_bound()).expect("Failed to convert max bound to T");
         self.par_pixels_mut().for_each(|pixel| {
-            *pixel = Luma {
-                l: max_value - pixel.l,
-            };
+            *pixel = Luma { l: 1.0 - pixel.l };
         });
 
         self
@@ -184,10 +159,9 @@ where
         let inv_gamma = 1.0 / gamma;
 
         self.par_pixels_mut().for_each(|pixel| {
-            let l = T::from((pixel.l.as_() / T::max_bound()).powf(inv_gamma) * T::max_bound())
-                .expect("Failed to convert gamma value to T");
-
-            *pixel = Luma { l };
+            *pixel = Luma {
+                l: pixel.l.powf(inv_gamma),
+            };
         });
 
         self
@@ -199,7 +173,7 @@ where
     /// Truncate => Pixels above the threshold are set to the threshold value, others remain
     /// unchanged.
     /// ToZero => Pixels above the threshold remain unchanged, others are set to 0.
-    fn threshold(self, threshold: T, max_intensity: T, kind: ThresholdType) -> Image<Luma<T>> {
+    fn threshold(self, threshold: f32, max_intensity: f32, kind: ThresholdType) -> Image<Luma> {
         let (width, height) = self.dimensions();
         let thresholded_pixels = self
             .pixels()
@@ -210,7 +184,7 @@ where
                         if l >= threshold {
                             max_intensity
                         } else {
-                            T::from(0).unwrap()
+                            0.0
                         }
                     }
                     ThresholdType::Truncate => {
@@ -224,13 +198,13 @@ where
                         if l > threshold {
                             l
                         } else {
-                            T::from(0).unwrap()
+                            0.0
                         }
                     }
                 };
                 Luma { l: new_l }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         Image::from_data(width, height, thresholded_pixels).unwrap()
     }
@@ -240,12 +214,12 @@ where
     fn histrogram_equalize(mut self) -> Self {
         let (width, height) = self.dimensions();
         let pixel_count = (width * height) as u32;
-        let channel_max = T::max_bound() as usize;
+        let channel_max = 255 as usize;
 
         // Find histogram
         let mut hist = vec![0u32; channel_max + 1];
         self.pixels().for_each(|pixel| {
-            let idx = pixel.l.as_() as usize;
+            let idx = (pixel.l * 255.0).round() as usize;
             hist[idx] += 1;
         });
 
@@ -260,21 +234,20 @@ where
         let cdf_min = *cdf.iter().find(|&&x| x > 0).unwrap_or(&0);
 
         // Populate lookup table
-        let mut lookup_table = vec![T::from(0).unwrap(); channel_max + 1];
+        let mut lookup_table = vec![0.0; channel_max + 1];
         let scale = channel_max as f32 / (pixel_count - cdf_min) as f32;
 
         for (i, value) in cdf.iter().enumerate() {
             let adjusted =
                 ((*value as f32 - cdf_min as f32) * scale).clamp(0.0, channel_max as f32);
-            lookup_table[i] =
-                T::from(adjusted.round()).expect("Failed to convert lookup value to T");
+            lookup_table[i] = adjusted;
         }
 
         // Apply equalization
         self.par_pixels_mut().for_each(|pixel| {
-            let intensity = pixel.l.as_() as usize;
+            let intensity = (pixel.l * 255.0).round() as usize;
             let new_intensity = lookup_table[intensity];
-            pixel.l = T::from(new_intensity).expect("Failed to convert lookup value to T");
+            pixel.l = new_intensity / 255.0; // Normalize back to [0.0, 1.0]
         });
 
         self

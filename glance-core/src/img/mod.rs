@@ -10,19 +10,19 @@
 //!
 //! // Load an image. Type annotations are required for the pixel type. (Might change in the
 //! // future)
-//! if let Ok(image)= Image::<Rgba<u8>>::open("input.png") {
+//! if let Ok(image)= Image::<Rgba>::open("input.png") {
 //!     let _ = image.display("My Image");
 //! }
 //! ```
 pub mod iterators;
 pub mod pixel;
 
-use std::path::Path;
-
 use crate::{CoreError, Result, drawing::traits::Drawable};
 use image::{ImageBuffer, ImageReader, Rgba as ImageRgba};
 use minifb::{Key, Window, WindowOptions};
-use pixel::{Pixel, Rgba};
+use pixel::{Luma, Pixel, Rgba};
+use rayon::prelude::*;
+use std::path::Path;
 
 /// Image struct represents an image with pixel data of type P
 /// where P implements the [`Pixel`] trait.
@@ -42,7 +42,7 @@ where
         Image {
             width,
             height,
-            data: vec![P::from_rgba8([0, 0, 0, 0]).unwrap(); width * height],
+            data: vec![P::new(); width * height],
         }
     }
 
@@ -67,8 +67,7 @@ where
         let width = width as usize;
         let height = height as usize;
 
-        let data: Result<Vec<P>> = image.pixels().map(|p| P::from_rgba8(p.0)).collect();
-        let data = data?;
+        let data: Vec<P> = image.pixels().map(|p| P::from_rgba8(p.0)).collect();
 
         Ok(Image {
             width,
@@ -175,27 +174,74 @@ where
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
+}
 
-    /// Convert the image to RGBA8 format.
-    pub fn to_rgba8(&self) -> Image<Rgba<u8>> {
-        let rgba_data: Vec<Rgba<u8>> = self
-            .data
-            .iter()
-            .map(|px| {
-                let rgba = px.to_rgba8();
-                Rgba {
-                    r: rgba[0],
-                    g: rgba[1],
-                    b: rgba[2],
-                    a: rgba[3],
-                }
+impl Image<Rgba> {
+    pub fn normalize(&self) -> Self {
+        // Find the maximum value in the pixel data for each channel
+        let (max_r, max_g, max_b, max_a) = self
+            .par_pixels()
+            .map(|pixel| (pixel.r, pixel.g, pixel.b, pixel.a))
+            .reduce(
+                || (0.0, 0.0, 0.0, 0.0),
+                |(max_r, max_g, max_b, max_a), (r, g, b, a)| {
+                    (max_r.max(r), max_g.max(g), max_b.max(b), max_a.max(a))
+                },
+            );
+
+        let (min_r, min_g, min_b, min_a) = self
+            .par_pixels()
+            .map(|pixel| (pixel.r, pixel.g, pixel.b, pixel.a))
+            .reduce(
+                || (f32::MAX, f32::MAX, f32::MAX, f32::MAX),
+                |(min_r, min_g, min_b, min_a), (r, g, b, a)| {
+                    (min_r.min(r), min_g.min(g), min_b.min(b), min_a.min(a))
+                },
+            );
+
+        // Normalize each pixel
+        let normalized = self
+            .par_pixels()
+            .map(|pixel| Rgba {
+                r: (pixel.r - min_r) / (max_r - min_r),
+                g: (pixel.g - min_g) / (max_g - min_g),
+                b: (pixel.b - min_b) / (max_b - min_b),
+                a: (pixel.a - min_a) / (max_a - min_a),
             })
             .collect();
 
-        Image {
+        Self {
             width: self.width,
             height: self.height,
-            data: rgba_data,
+            data: normalized,
+        }
+    }
+}
+
+impl Image<Luma> {
+    pub fn normalize(&self) -> Self {
+        // Find the maximum value in the pixel data for each channel
+        let max_l = self
+            .par_pixels()
+            .map(|pixel| pixel.l)
+            .reduce(|| 0.0, |max_l, l| (max_l.max(l)));
+
+        let min_l = self
+            .par_pixels()
+            .map(|pixel| pixel.l)
+            .reduce(|| f32::MAX, |min_l, l| (min_l.min(l)));
+        // Normalize each pixel
+        let normalized = self
+            .par_pixels()
+            .map(|pixel| Luma {
+                l: (pixel.l - min_l) / (max_l - min_l),
+            })
+            .collect();
+
+        Self {
+            width: self.width,
+            height: self.height,
+            data: normalized,
         }
     }
 }
