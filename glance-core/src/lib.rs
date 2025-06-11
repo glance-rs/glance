@@ -20,7 +20,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/lichtenstein.png");
 
-        let img: Image<Rgba<u8>> = Image::open(&path)?;
+        let img: Image<Rgba> = Image::open(&path)?;
 
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("open_valid_image")?;
@@ -33,7 +33,7 @@ mod tests {
     // Open an invalid image path
     #[test]
     fn open_invalid_path() {
-        let result = Image::<Rgba<u8>>::open("non_existent_file.jpg");
+        let result = Image::<Rgba>::open("non_existent_file.jpg");
         assert!(result.is_err());
     }
 
@@ -48,10 +48,10 @@ mod tests {
 
         let center = (dims.0 / 2, dims.1 / 2);
         let green = Rgba {
-            r: 0u8,
-            g: 255u8,
-            b: 0u8,
-            a: 150u8,
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            a: 0.6,
         };
 
         img.draw(Circle {
@@ -76,16 +76,15 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/lichtenstein.png");
 
-        let mut img = Image::<Rgba<u8>>::open(&path)?;
+        let mut img = Image::<Rgba>::open(&path)?;
         img.par_pixels_mut().for_each(|pixel| {
             let (r, g, b, _) = (pixel.r, pixel.g, pixel.b, pixel.a);
             let l = 0.299f32 * r as f32 + 0.587f32 * g as f32 + 0.114f32 * b as f32;
-            let l = l as u8;
             *pixel = Rgba {
                 r: l,
                 g: l,
                 b: l,
-                a: l,
+                a: 1.0,
             };
         });
 
@@ -102,21 +101,21 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/eye_orange.png");
 
-        let mut img = Image::<Rgba<u8>>::open(&path)?;
+        let mut img = Image::<Rgba>::open(&path)?;
         let center = img.dimensions();
 
         let green = Rgba {
-            r: 0u8,
-            g: 255u8,
-            b: 0u8,
-            a: 150u8,
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            a: 0.6,
         };
 
         let black = Rgba {
-            r: 0u8,
-            g: 0u8,
-            b: 0u8,
-            a: 0u8,
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.0,
         };
 
         img.draw(Circle {
@@ -138,17 +137,17 @@ mod tests {
     // Create a Luma image and convert it to RGBA8
     #[test]
     fn create_luma_image_and_convert() -> Result<()> {
-        let mut img = Image::<Luma<u8>>::new(512, 512);
+        let mut img = Image::<Luma>::new(512, 512);
         img.par_pixels_mut().enumerate().for_each(|(idx, pixel)| {
             let x = idx % 512;
-            let value = (x as f32 / 511.0 * 255.0) as u8;
+            let value = x as f32 / 511.0;
             *pixel = Luma { l: value };
         });
 
         assert!(!img.is_empty());
         assert_eq!(img.dimensions(), (512, 512));
-        assert_eq!(img.get_pixel((0, 0))?.l, 0);
-        assert_eq!(img.get_pixel((511, 0))?.l, 255);
+        assert_eq!(img.get_pixel((0, 0))?.l, 0.0);
+        assert_eq!(img.get_pixel((511, 0))?.l, 1.0);
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("create_luma_image_and_convert")?;
         }

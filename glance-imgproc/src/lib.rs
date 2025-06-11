@@ -20,7 +20,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/flower.jpg");
 
-        let img = Image::<Rgba<u8>>::open(&path)?;
+        let img = Image::<Rgba>::open(&path)?;
         let img = img.invert();
 
         if std::env::var("NO_DISPLAY").is_err() {
@@ -35,7 +35,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/lichtenstein.png");
 
-        let img = Image::<Rgba<u16>>::open(&path)?;
+        let img = Image::<Rgba>::open(&path)?;
         let img = img.grayscale();
 
         if std::env::var("NO_DISPLAY").is_err() {
@@ -50,10 +50,10 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/lichtenstein.png");
 
-        let img = Image::<Rgba<u16>>::open(&path)?;
+        let img = Image::<Rgba>::open(&path)?;
         let img = img
             .grayscale()
-            .threshold(32000, 65535, point_ops::ThresholdType::Binary);
+            .threshold(0.5, 1.0, point_ops::ThresholdType::Binary);
 
         if std::env::var("NO_DISPLAY").is_err() {
             img.display("threshold_image")?;
@@ -67,7 +67,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../media/test_imgs/lichtenstein.png");
 
-        let img = Image::<Rgba<u16>>::open(&path)?;
+        let img = Image::<Rgba>::open(&path)?;
         let img = img.grayscale().histrogram_equalize();
 
         if std::env::var("NO_DISPLAY").is_err() {
@@ -84,10 +84,10 @@ mod tests {
         let path1 = dir_path.join("lichtenstein.png");
         let path2 = dir_path.join("pepper.bmp");
 
-        let img1 = Image::<Rgba<u8>>::open(path1)?;
-        let img2 = Image::<Rgba<u8>>::open(path2)?;
+        let img1 = Image::<Rgba>::open(path1)?;
+        let img2 = Image::<Rgba>::open(path2)?;
 
-        let lerp_img = img1.lerp(&img2, 1.0);
+        let lerp_img = img1.lerp(&img2, 0.5);
 
         if std::env::var("NO_DISPLAY").is_err() {
             lerp_img.display("lerp_images")?;
@@ -102,7 +102,7 @@ mod tests {
         dir_path.push("../media/test_imgs/");
         let path1 = dir_path.join("lichtenstein.png");
 
-        let img1 = Image::<Rgba<u8>>::open(path1)?;
+        let img1 = Image::<Rgba>::open(path1)?;
         let img1 = img1.contrast(1.9);
 
         if std::env::var("NO_DISPLAY").is_err() {
