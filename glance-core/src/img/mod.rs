@@ -93,6 +93,12 @@ where
         Ok(())
     }
 
+    /// Fills the image with the specified color.
+    pub fn fill(mut self, color: P) -> Self {
+        self.data.fill(color);
+        self
+    }
+
     /// Opens an [`Image`] instance and displays it in a window.
     pub fn display(&self, title: &str) -> Result<()> {
         let (width, height) = self.dimensions();
@@ -127,6 +133,19 @@ where
         }
 
         Ok(())
+    }
+
+    /// Vertically stacks two images of the same width.
+    pub fn vstack(mut self, other: &Self) -> Result<Self> {
+        if self.width != other.width {
+            return Err(CoreError::InvalidData(
+                "Images must have the same width to stack vertically".to_string(),
+            ));
+        }
+
+        self.height += other.height;
+        self.data.extend(other.data.clone());
+        Ok(self)
     }
 
     /// Returns a reference to the pixel data at the specified position.
@@ -177,9 +196,11 @@ where
 }
 
 impl Image<Rgba> {
+    /// Min-max normalizes the pixel data in the image.
+    /// The alpha channel is not modified.
     pub fn normalize(&self) -> Self {
         // Find the maximum value in the pixel data for each channel
-        let (max_r, max_g, max_b, max_a) = self
+        let (max_r, max_g, max_b, _max_a) = self
             .par_pixels()
             .map(|pixel| (pixel.r, pixel.g, pixel.b, pixel.a))
             .reduce(
@@ -189,7 +210,7 @@ impl Image<Rgba> {
                 },
             );
 
-        let (min_r, min_g, min_b, min_a) = self
+        let (min_r, min_g, min_b, _min_a) = self
             .par_pixels()
             .map(|pixel| (pixel.r, pixel.g, pixel.b, pixel.a))
             .reduce(
@@ -206,7 +227,7 @@ impl Image<Rgba> {
                 r: (pixel.r - min_r) / (max_r - min_r),
                 g: (pixel.g - min_g) / (max_g - min_g),
                 b: (pixel.b - min_b) / (max_b - min_b),
-                a: (pixel.a - min_a) / (max_a - min_a),
+                a: pixel.a,
             })
             .collect();
 
@@ -216,9 +237,21 @@ impl Image<Rgba> {
             data: normalized,
         }
     }
+
+    /// Applies a function to each pixel in the image, returning a new image.
+    /// The alpha channel is not modified.
+    pub fn apply<F>(mut self, f: F) -> Self
+    where
+        F: Fn(f32) -> f32 + Sync + Send,
+    {
+        self.par_pixels_mut()
+            .for_each(|pixel| *pixel = pixel.apply(&f));
+        self
+    }
 }
 
 impl Image<Luma> {
+    /// Min-max normalizes the pixel data in the image.
     pub fn normalize(&self) -> Self {
         // Find the maximum value in the pixel data for each channel
         let max_l = self
@@ -243,5 +276,15 @@ impl Image<Luma> {
             height: self.height,
             data: normalized,
         }
+    }
+
+    /// Applies a function to each pixel in the image, returning a new image.
+    pub fn apply<F>(mut self, f: F) -> Self
+    where
+        F: Fn(f32) -> f32 + Sync + Send,
+    {
+        self.par_pixels_mut()
+            .for_each(|pixel| *pixel = pixel.apply(&f));
+        self
     }
 }

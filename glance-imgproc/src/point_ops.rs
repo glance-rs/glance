@@ -29,6 +29,7 @@ pub trait PointOpsExtRgba {
 pub trait PointOpsExtLuma {
     fn invert(self) -> Self;
     fn gamma(self, gamma: f32) -> Self;
+    fn lerp(self, other: &Image<Luma>, alpha: f32) -> Image<Luma>;
     fn threshold(self, threshold: f32, max_intensity: f32, kind: ThresholdType) -> Image<Luma>;
     fn histrogram_equalize(self) -> Self;
 }
@@ -214,7 +215,7 @@ impl PointOpsExtLuma for Image<Luma> {
     fn histrogram_equalize(mut self) -> Self {
         let (width, height) = self.dimensions();
         let pixel_count = (width * height) as u32;
-        let channel_max = 255 as usize;
+        let channel_max = 255_usize;
 
         // Find histogram
         let mut hist = vec![0u32; channel_max + 1];
@@ -251,5 +252,27 @@ impl PointOpsExtLuma for Image<Luma> {
         });
 
         self
+    }
+
+    /// Linearly interpolates between two images of the same dimensions.
+    /// The alpha parameter controls the interpolation factor.
+    fn lerp(self, other: &Image<Luma>, alpha: f32) -> Image<Luma> {
+        let (width, height) = self.dimensions();
+        if (width, height) != other.dimensions() {
+            panic!(
+                "Cannot lerp images of different dimensions: {:?} and {:?}",
+                (width, height),
+                other.dimensions()
+            );
+        }
+        let lerped_pixels = self
+            .pixels()
+            .zip(other.pixels())
+            .map(|(px1, px2)| Luma {
+                l: px1.l * (1.0 - alpha) + px2.l * alpha,
+            })
+            .collect::<Vec<_>>();
+
+        Image::from_data(width, height, lerped_pixels).unwrap()
     }
 }
