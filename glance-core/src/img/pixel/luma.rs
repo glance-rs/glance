@@ -27,3 +27,13 @@ impl Pixel for Luma {
         [l, l, l, 255]
     }
 }
+
+impl Luma {
+    pub fn apply<F>(mut self, f: F) -> Self
+    where
+        F: Fn(f32) -> f32,
+    {
+        self.l = f(self.l);
+        self
+    }
+}

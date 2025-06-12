@@ -51,3 +51,16 @@ impl From<[u8; 4]> for Rgba {
         }
     }
 }
+
+impl Rgba {
+    pub fn apply<F>(mut self, f: F) -> Self
+    where
+        F: Fn(f32) -> f32,
+    {
+        self.r = f(self.r);
+        self.g = f(self.g);
+        self.b = f(self.b);
+        self.a = f(self.a);
+        self
+    }
+}
