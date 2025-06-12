@@ -7,6 +7,7 @@ description = "A high-level core library for image IO, display, and drawing oper
 license = "GPL-3.0"
 keywords = ["image", "graphics", "display"]
 categories = ["graphics", "computer-vision", "visualization", "multimedia::images"]
+repository = "https://github.com/glance-rs/glance"
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["from"] }
