@@ -1,9 +1,10 @@
-mod error;
+pub mod affine_transformations;
 pub mod kernels;
 pub mod linear_filters;
 pub mod nonlinear_filters;
 pub mod point_ops;
 
+mod error;
 pub use error::{Error, Result};
 
 #[cfg(test)]
@@ -11,8 +12,9 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::Result;
+    use crate::affine_transformations::AffineTransformationsExtLuma;
     use crate::kernels;
-    use crate::linear_filters::ConvolutionExtLuma;
+    use crate::linear_filters::{BorderMode, ConvolutionExtLuma};
     use crate::nonlinear_filters::NonLinearFilterExtLuma;
     use glance_core::img::pixel::Rgba;
     use glance_core::img::{Image, pixel::Luma};
@@ -130,10 +132,10 @@ mod tests {
 
         let horizontal_img = img
             .clone()
-            .convolve_2d(horizontal_kernel)
+            .convolve_2d(horizontal_kernel, BorderMode::Replicate)
             .apply(|f| f32::powf(f, 2.0));
         let vertical_img = img
-            .convolve_2d(vertical_kernel)
+            .convolve_2d(vertical_kernel, BorderMode::Replicate)
             .apply(|f| f32::powf(f, 2.0));
 
         let img = horizontal_img
@@ -159,8 +161,8 @@ mod tests {
         let gaussian_kernel = kernels::gaussian_filter(3, 0.1);
 
         if std::env::var("NO_DISPLAY").is_err() {
-            img.convolve_2d(gaussian_kernel)
-                .convolve_2d(laplacian_kernel)
+            img.convolve_2d(gaussian_kernel, BorderMode::Replicate)
+                .convolve_2d(laplacian_kernel, BorderMode::Replicate)
                 .apply(f32::abs)
                 .normalize()
                 .display("laplacian_convolve")?;
@@ -181,6 +183,23 @@ mod tests {
         if std::env::var("NO_DISPLAY").is_err() {
             img.vstack(&median_blurred_img)?
                 .display("nonlinear_filters_median_blur")?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn affine_transformations() -> Result<()> {
+        let mut dir_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        dir_path.push("../media/test_imgs/");
+        let path = dir_path.join("lenna.png");
+
+        let img = Image::<Luma>::open(path)?;
+
+        if std::env::var("NO_DISPLAY").is_err() {
+            img.scale((2.0, 2.0))
+                .translate((-50.0, -50.0))
+                .display("affine_transformations_rotate")?;
         }
 
         Ok(())

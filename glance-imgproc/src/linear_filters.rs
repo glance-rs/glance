@@ -1,15 +1,30 @@
-use glance_core::img::{
-    Image,
-    pixel::{Luma, Rgba},
+use glance_core::{
+    CoreError, Result,
+    img::{
+        Image,
+        pixel::{Luma, Pixel, Rgba},
+    },
 };
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 
+#[derive(Debug, Clone)]
+pub enum BorderMode {
+    /// Replicate the border pixels
+    Replicate,
+    /// Wrap around the image edges
+    Wrap,
+    /// Use a constant value for out-of-bounds pixels
+    Constant(f32),
+    /// Reflect the image edges
+    Reflect,
+}
+
 pub trait LinearFilterExtRgba {
-    fn convolve_2d(self, kernel: Image<Luma>) -> Image<Rgba>;
+    fn convolve_2d(self, kernel: Image<Luma>, border_mode: BorderMode) -> Image<Rgba>;
 }
 
 impl LinearFilterExtRgba for Image<Rgba> {
-    fn convolve_2d(self, kernel: Image<Luma>) -> Image<Rgba> {
+    fn convolve_2d(self, kernel: Image<Luma>, border_mode: BorderMode) -> Image<Rgba> {
         let (kernel_width, kernel_height) = kernel.dimensions();
         if kernel_width % 2 == 0 || kernel_height % 2 == 0 {
             panic!("Kernel size must be odd in both dimensions");
@@ -35,21 +50,57 @@ impl LinearFilterExtRgba for Image<Rgba> {
                 for ky in 0..kernel_height {
                     for kx in 0..kernel_width {
                         let kernel_value = kernel.get_pixel((kx, ky)).unwrap();
-                        let input_x = x as isize + kx as isize - kernel_half_width as isize;
-                        let input_y = y as isize + ky as isize - kernel_half_height as isize;
+                        let mut input_x = x as isize + kx as isize - kernel_half_width as isize;
+                        let mut input_y = y as isize + ky as isize - kernel_half_height as isize;
 
-                        if input_x < 0 || input_y < 0 {
-                            continue; // Skip out-of-bounds pixels
-                        }
+                        let input_pixel = match border_mode {
+                            BorderMode::Constant(value) => {
+                                if input_x < 0
+                                    || input_y < 0
+                                    || input_x >= input_width as isize
+                                    || input_y >= input_height as isize
+                                {
+                                    &Rgba {
+                                        r: value,
+                                        g: value,
+                                        b: value,
+                                        a: alpha,
+                                    }
+                                } else {
+                                    self.get_pixel((input_x as usize, input_y as usize))
+                                        .unwrap()
+                                }
+                            }
+                            BorderMode::Replicate => {
+                                input_x = input_x.clamp(0, input_width as isize - 1);
+                                input_y = input_y.clamp(0, input_height as isize - 1);
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                            BorderMode::Wrap => {
+                                input_x = (input_x + input_width as isize) % input_width as isize;
+                                input_y = (input_y + input_height as isize) % input_height as isize;
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                            BorderMode::Reflect => {
+                                if input_x < 0 {
+                                    input_x = -input_x;
+                                } else if input_x >= input_width as isize {
+                                    input_x = 2 * (input_width as isize - 1) - input_x;
+                                }
+                                if input_y < 0 {
+                                    input_y = -input_y;
+                                } else if input_y >= input_height as isize {
+                                    input_y = 2 * (input_height as isize - 1) - input_y;
+                                }
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                        };
 
                         let input_x = input_x as usize;
                         let input_y = input_y as usize;
-
-                        if input_x >= input_width || input_y >= input_height {
-                            continue; // Skip out-of-bounds pixels
-                        }
-
-                        let input_pixel = self.get_pixel((input_x, input_y)).unwrap();
 
                         if input_x < input_width && input_y < input_height {
                             r_sum += input_pixel.r * kernel_value.l;
@@ -73,11 +124,11 @@ impl LinearFilterExtRgba for Image<Rgba> {
 }
 
 pub trait ConvolutionExtLuma {
-    fn convolve_2d(self, kernel: Image<Luma>) -> Image<Luma>;
+    fn convolve_2d(self, kernel: Image<Luma>, border_mode: BorderMode) -> Image<Luma>;
 }
 
 impl ConvolutionExtLuma for Image<Luma> {
-    fn convolve_2d(self, kernel: Image<Luma>) -> Image<Luma> {
+    fn convolve_2d(self, kernel: Image<Luma>, border_mode: BorderMode) -> Image<Luma> {
         let (kernel_width, kernel_height) = kernel.dimensions();
         if kernel_width % 2 == 0 || kernel_height % 2 == 0 {
             panic!("Kernel size must be odd in both dimensions");
@@ -100,21 +151,52 @@ impl ConvolutionExtLuma for Image<Luma> {
                 for ky in 0..kernel_height {
                     for kx in 0..kernel_width {
                         let kernel_value = kernel.get_pixel((kx, ky)).unwrap();
-                        let input_x = x as isize + kx as isize - kernel_half_width as isize;
-                        let input_y = y as isize + ky as isize - kernel_half_height as isize;
+                        let mut input_x = x as isize + kx as isize - kernel_half_width as isize;
+                        let mut input_y = y as isize + ky as isize - kernel_half_height as isize;
 
-                        if input_x < 0 || input_y < 0 {
-                            continue; // Skip out-of-bounds pixels
-                        }
+                        let input_pixel = match border_mode {
+                            BorderMode::Constant(value) => {
+                                if input_x < 0
+                                    || input_y < 0
+                                    || input_x >= input_width as isize
+                                    || input_y >= input_height as isize
+                                {
+                                    &Luma { l: value }
+                                } else {
+                                    self.get_pixel((input_x as usize, input_y as usize))
+                                        .unwrap()
+                                }
+                            }
+                            BorderMode::Replicate => {
+                                input_x = input_x.clamp(0, input_width as isize - 1);
+                                input_y = input_y.clamp(0, input_height as isize - 1);
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                            BorderMode::Wrap => {
+                                input_x = (input_x + input_width as isize) % input_width as isize;
+                                input_y = (input_y + input_height as isize) % input_height as isize;
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                            BorderMode::Reflect => {
+                                if input_x < 0 {
+                                    input_x = -input_x;
+                                } else if input_x >= input_width as isize {
+                                    input_x = 2 * (input_width as isize - 1) - input_x;
+                                }
+                                if input_y < 0 {
+                                    input_y = -input_y;
+                                } else if input_y >= input_height as isize {
+                                    input_y = 2 * (input_height as isize - 1) - input_y;
+                                }
+                                self.get_pixel((input_x as usize, input_y as usize))
+                                    .unwrap()
+                            }
+                        };
 
                         let input_x = input_x as usize;
                         let input_y = input_y as usize;
-
-                        if input_x >= input_width || input_y >= input_height {
-                            continue; // Skip out-of-bounds pixels
-                        }
-
-                        let input_pixel = self.get_pixel((input_x, input_y)).unwrap();
 
                         if input_x < input_width && input_y < input_height {
                             l_sum += input_pixel.l * kernel_value.l;
